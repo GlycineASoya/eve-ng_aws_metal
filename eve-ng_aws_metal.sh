@@ -63,3 +63,12 @@ EOF
 
 wget -O - http://www.eve-ng.net/repo/install-eve.sh | bash -i
 #after this command update clients known_hosts
+
+
+apt update -y
+apt install -y dnsmasq
+sed -i -e 's/#listen-address=/listen-address=::1,127.0.0.1,10.0.0.1/' /etc/dnsmasq.conf
+sed -i -e 's/#interface=/interface=pnet1/' /etc/dnsmasq.conf
+sed -i -e 's/#dhcp-range=192.168.0.50,192.168.0.150,255.255.255.0,12h/dhcp-range=10.0.0.100,10.0.1.254,255.255.255.0,12h/' /etc/dnsmasq.conf
+sed -i -e 's/#dhcp-leasefile=/dhcp-leasefile=/' /etc/dnsmasq.conf
+sed -i -e 's/#dhcp-authoritative/dhcp-authoritative/' /etc/dnsmasq.conf
