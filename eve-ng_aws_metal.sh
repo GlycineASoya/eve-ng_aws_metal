@@ -108,11 +108,9 @@ iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -o pnet0 -j MASQUERADE
 #ALLOWING DHCP (UDP:67) AND DNS (UDP:53) PORTS ON PNET1 (LAB ENVIRONMENT)
 iptables -A INPUT -i pnet1 -p udp -m udp --dport 67 -j ACCEPT
 iptables -A INPUT -i pnet1 -p udp -m udp --dport 53 -j ACCEPT
+iptables-save
 
-apt update -y
-apt install -y dnsmasq
-sed -i -e 's/#listen-address=/listen-address=::1,127.0.0.1,10.0.0.1/' /etc/dnsmasq.conf
-sed -i -e 's/#interface=/interface=pnet1/' /etc/dnsmasq.conf
-sed -i -e 's/#dhcp-range=192.168.0.50,192.168.0.150,255.255.255.0,12h/dhcp-range=10.0.0.50,10.0.0.254,255.255.255.0,12h/' /etc/dnsmasq.conf
-sed -i -e 's/#dhcp-leasefile=/dhcp-leasefile=/' /etc/dnsmasq.conf
-sed -i -e 's/#dhcp-authoritative/dhcp-authoritative/' /etc/dnsmasq.conf
+apt install -y isc-dhcp-server
+sed -i -e 's/INTERFACES=""/INTERFACES="pnet1"/' /etc/default/isc-dhcp-server
+echo "subnet 10.0.0.0 netmask 255.0.0.0 {range 10.0.0.2 10.0.0.254; option domain-name-servers 8.8.8.8; option subnet-mask 255.0.0.0; option routers 10.0.0.1; option broadcast-address 10.255.255.255; default-lease-time 600; max-lease-time 7200;}" >> /etc/dhcp/dhcpd.conf
+systemctl restart isc-dhcp-server.service
