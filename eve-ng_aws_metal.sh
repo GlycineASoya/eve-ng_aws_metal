@@ -1,3 +1,4 @@
+#!/bin/sh
 #At the first time:
 #On the server:
 #useradd -m -G sudo,adm <username>
