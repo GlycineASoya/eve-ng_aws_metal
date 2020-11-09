@@ -1,26 +1,26 @@
-At the first time:
-On the server:
-useradd -m -G sudo,adm <username>
-On the client:
-ssh-keygen -b 4096 -t ed25519 -f <output_file>
-ssh-add <private_key>
-ssh-copy-id [-i <pem_file>.pem] root@<host>
-OR
-scp [-i <pem_file>.pem] <output_file>.pub root@<host>:/home/<username>/.ssh/authorized_keys
+#At the first time:
+#On the server:
+#useradd -m -G sudo,adm <username>
+#On the client:
+#ssh-keygen -b 4096 -t ed25519 -f <output_file>
+#ssh-add <private_key>
+#ssh-copy-id [-i <pem_file>.pem] root@<host>
+#OR
+#scp [-i <pem_file>.pem] <output_file>.pub root@<host>:/home/<username>/.ssh/authorized_keys
 
-The client side
-ssh-keygen -b 4096 -t ed25519 -f <output_file>
-ssh-copy-id -i <output_file> <username>@<host>
-OR
-scp <output_file>.pub <username>@<host>:/home/<username>/.ssh
+#The client side
+#ssh-keygen -b 4096 -t ed25519 -f <output_file>
+#ssh-copy-id -i <output_file> <username>@<host>
+#OR
+#scp <output_file>.pub <username>@<host>:/home/<username>/.ssh
 
-Run all as root
-The server side optional:
-useradd -m -G sudo <username>
-passwd -e <username>
-userdel -r <username>
+#Run all as root
+#The server side optional:
+#useradd -m -G sudo <username>
+#passwd -e <username>
+#userdel -r <username>
 
-The server side
+#The server side
 mkdir /etc/skel/.ssh
 sed -i -e 's/# auth       required   pam_wheel.so/ auth       required   pam_wheel.so/' /etc/pam.d/su
 sed -i -e 's/PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
@@ -32,6 +32,11 @@ sed -i -e 's/nameserver 0.0.0.0/nameserver 8.8.8.8/' /etc/resolv.conf
 sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 noquiet"/' /etc/default/grub
 update-grub
 
+apt-get update -y
+apt-get install -y bridge-utils
+
+cat > /etc/eve-ng-interface-tuning.sh << EOF
+#!/bin/sh
 cat > /etc/network/interfaces << EOF
 # This file describes the network interfaces available on your system
 # and how to activate them. For more information, see interfaces(5).
@@ -59,16 +64,37 @@ iface pnet1 inet static
     address 10.0.0.1
     netmask 255.0.0.0
 EOF
+chmod +x /etc/eve-ng-interface-tuning.sh
+
+cat > /etc/systemd/system/eve-ng-interface-tuning.service << EOF
+[Unit]
+Description=Run my custom task at shutdown
+DefaultDependencies=no
+Before=shutdown.target reboot.target
+
+[Service]
+Type=oneshot
+ExecStart=/etc/eve-ng-interface-tuning.sh
+TimeoutStartSec=0
+
+[Install]
+WantedBy=shutdown.target reboot.target
+EOF
+
+systemctl enable int-tune.service
 
 
 wget -O - http://www.eve-ng.net/repo/install-eve.sh | bash -i
 #after this command update clients known_hosts
 
+echo "1" > /proc/sys/net/ipv4/ip_forward
+iptables -A FORWARD -i pnet1 -j ACCEPT
+iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -o pnet0 -j MASQUERADE
 
 apt update -y
 apt install -y dnsmasq
 sed -i -e 's/#listen-address=/listen-address=::1,127.0.0.1,10.0.0.1/' /etc/dnsmasq.conf
 sed -i -e 's/#interface=/interface=pnet1/' /etc/dnsmasq.conf
-sed -i -e 's/#dhcp-range=192.168.0.50,192.168.0.150,255.255.255.0,12h/dhcp-range=10.0.0.100,10.0.1.254,255.255.255.0,12h/' /etc/dnsmasq.conf
+sed -i -e 's/#dhcp-range=192.168.0.50,192.168.0.150,255.255.255.0,12h/dhcp-range=10.0.0.50,10.0.0.254,255.255.255.0,12h/' /etc/dnsmasq.conf
 sed -i -e 's/#dhcp-leasefile=/dhcp-leasefile=/' /etc/dnsmasq.conf
 sed -i -e 's/#dhcp-authoritative/dhcp-authoritative/' /etc/dnsmasq.conf
