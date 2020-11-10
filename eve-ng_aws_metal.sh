@@ -38,6 +38,7 @@ sed -i -e 's/# auth       required   pam_wheel.so/ auth       required   pam_whe
 #CONFIGURING ONLY PUBKEY AUTHENTICATION
 sed -i -e 's/PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i -e 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i -e 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 
 #ADDING GOOGLE DNS NAMESERVER
 sed -i -e 's/nameserver 0.0.0.0/nameserver 8.8.8.8/' /etc/resolv.conf
@@ -110,7 +111,13 @@ iptables -A INPUT -i pnet1 -p udp -m udp --dport 67 -j ACCEPT
 iptables -A INPUT -i pnet1 -p udp -m udp --dport 53 -j ACCEPT
 iptables-save
 
+#MAKE IT PERMANENT
+echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
+echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
+apt-get -y install iptables-persistent
+
+#DEPLOYING AND ALLOWING 10.0.0.50 10.0.0.254 DHCP ASSIGNING
 apt install -y isc-dhcp-server
 sed -i -e 's/INTERFACES=""/INTERFACES="pnet1"/' /etc/default/isc-dhcp-server
-echo "subnet 10.0.0.0 netmask 255.0.0.0 {range 10.0.0.2 10.0.0.254; option domain-name-servers 8.8.8.8; option subnet-mask 255.0.0.0; option routers 10.0.0.1; option broadcast-address 10.255.255.255; default-lease-time 600; max-lease-time 7200;}" >> /etc/dhcp/dhcpd.conf
+echo "subnet 10.0.0.0 netmask 255.0.0.0 {range 10.0.0.50 10.0.0.254; option domain-name-servers 8.8.8.8; option subnet-mask 255.0.0.0; option routers 10.0.0.1; option broadcast-address 10.255.255.255; default-lease-time 600; max-lease-time 7200;}" >> /etc/dhcp/dhcpd.conf
 systemctl restart isc-dhcp-server.service
