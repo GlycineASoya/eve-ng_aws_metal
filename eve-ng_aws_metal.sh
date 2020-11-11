@@ -109,6 +109,7 @@ iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -o pnet0 -j MASQUERADE
 #ALLOWING DHCP (UDP:67) AND DNS (UDP:53) PORTS ON PNET1 (LAB ENVIRONMENT)
 iptables -A INPUT -i pnet1 -p udp -m udp --dport 67 -j ACCEPT
 iptables -A INPUT -i pnet1 -p udp -m udp --dport 53 -j ACCEPT
+iptables -A INPUT -i pnet1 -p tcp -m tcp --dport 1194 -j ACCEPT
 iptables-save
 
 #MAKE IT PERMANENT
@@ -121,3 +122,158 @@ apt install -y isc-dhcp-server
 sed -i -e 's/INTERFACES=""/INTERFACES="pnet1"/' /etc/default/isc-dhcp-server
 echo "subnet 10.0.0.0 netmask 255.0.0.0 {range 10.0.0.50 10.0.0.254; option domain-name-servers 8.8.8.8; option subnet-mask 255.0.0.0; option routers 10.0.0.1; option broadcast-address 10.255.255.255; default-lease-time 600; max-lease-time 7200;}" >> /etc/dhcp/dhcpd.conf
 systemctl restart isc-dhcp-server.service
+
+#DEPLOYING OPENVPN
+apt-get update -y
+apt-get install -y openvpn easy-rsa 
+make-cadir /openvpn/openvpn-ca
+
+#CONFIGURING THE VARS FILE
+cp /openvpn/openvpn-ca/vars /openvpn/openvpn-ca/vars.orig
+sed -i -e 's/export KEY_COUNTRY="US"/export KEY_COUNTRY="PL"/' /openvpn/openvpn-ca/vars
+sed -i -e 's/export KEY_PROVINCE="CA"/export KEY_PROVINCE="MP"/' /openvpn/openvpn-ca/vars
+sed -i -e 's/export KEY_CITY="SanFrancisco"/export KEY_CITY="Krakow"/' /openvpn/openvpn-ca/vars
+sed -i -e 's/export KEY_ORG="Fort-Funston"/export KEY_ORG="hardbasslab"/' /openvpn/openvpn-ca/vars
+sed -i -e 's/export KEY_EMAIL="me@myhost.mydomain"/export KEY_EMAIL="admin@hardbasslab.ddns.com"/' /openvpn/openvpn-ca/vars
+sed -i -e 's/export KEY_OU="MyOrganizationalUnit"/export KEY_OU="Lab"/' /openvpn/openvpn-ca/vars
+sed -i -e 's/export KEY_NAME="EasyRSA"/export KEY_NAME="server"/' /openvpn/openvpn-ca/vars
+
+cat > /openvpn/openvpn-ca/build_ca.sh << EOF
+#!/usr/bin/expect -f
+spawn ./build-ca
+expect "Country*"
+send "\r"
+expect "State*"
+send "\r"
+expect "Locality*"
+send "\r"
+expect "Organization*"
+send "\r"
+expect "Organizational*"
+send "\r"
+expect "Common*"
+send "eve-ng\r"
+expect "Name*"
+send "\r"
+expect "Email*"
+send "\r"
+expect eof
+EOF
+chmod +x /openvpn/openvpn-ca/build_ca.sh
+
+cd /openvpn/openvpn-ca/
+source ./vars
+./clean-all
+./build_ca.sh
+
+
+cat > /openvpn/openvpn-ca/build_key_server.sh << EOF
+#!/usr/bin/expect -f
+spawn ./build-key-server server
+expect "Country*"
+send "\r"
+expect "State*"
+send "\r"
+expect "Locality*"
+send "\r"
+expect "Organization*"
+send "\r"
+expect "Organizational*"
+send "\r"
+expect "Common*"
+send "eve-ng\r"
+expect "Name*"
+send "\r"
+expect "Email*"
+send "\r"
+expect "A challenge*"
+send "\r"
+expect "An optional*"
+send "\r"
+expect "Sign*"
+send "y\r"
+send "y\r"
+expect eof
+EOF
+chmod +x /openvpn/openvpn-ca/build_key_server.sh
+
+cd /openvpn/openvpn-ca
+./build_key_server.sh
+./build-dh
+openvpn --genkey --secret keys/ta.key
+
+cp /openvpn/openvpn-ca/keys/ca.crt /openvpn/openvpn-ca/keys/server.crt /openvpn/openvpn-ca/keys/server.key /openvpn/openvpn-ca/keys/ta.key /openvpn/openvpn-ca/keys/dh2048.pem /etc/openvpn 
+
+#CONFIGURING SERVER SIDE
+cat > /etc/openvpn/server.conf << EOF
+port 1194
+proto tcp
+dev tun
+ca ca.crt
+cert server.crt
+key server.key  # This file should be kept secret
+# Diffie hellman parameters.
+# Generate your own with: openssl dhparam -out dh2048.pem 2048
+dh dh2048.pem
+server 10.1.0.0 255.255.255.0
+ifconfig-pool-persist ipp.txt
+keepalive 10 120
+tls-auth ta.key 0 # This file is secret
+cipher AES-256-CBC
+auth SHA256
+comp-lzo
+user nobody
+group nogroup
+persist-key
+persist-tun
+status openvpn-status.log
+verb 4
+EOF
+
+systemctl enable --now openvpn@server
+
+mkdir -p /openvpn/client-configs/files
+chmod 700 /openvpn/client-configs/files
+
+#CONFIGURING CLIENT SIDE
+cat > /openvpn/client-configs/base.conf << EOF
+client
+dev tun
+proto tcp
+remote 192.168.0.117 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+tls-auth ta.key 1
+cipher AES-256-CBC
+auth SHA256
+comp-lzo
+verb 4
+EOF
+
+#CONFIGURING SCRIPT TO BUILD BASE CONF FILE
+cat > /openvpn/client-configs/make_config.sh << 'EOF'
+#!/bin/bash
+# First argument: Client identifier
+KEY_DIR=/openvpn/openvpn-ca/keys
+OUTPUT_DIR=/openvpn/client-configs/files
+BASE_CONFIG=/openvpn/client-configs/base.conf
+
+cat ${BASE_CONFIG} \
+    <(echo -e '<ca>') \
+    ${KEY_DIR}/ca.crt \
+    <(echo -e '</ca>\n<cert>') \
+    ${KEY_DIR}/${1}.crt \
+    <(echo -e '</cert>\n<key>') \
+    ${KEY_DIR}/${1}.key \
+    <(echo -e '</key>\n<tls-auth>') \
+    ${KEY_DIR}/ta.key \
+    <(echo -e '</tls-auth>') \
+    > ${OUTPUT_DIR}/${1}.ovpn
+EOF
+chmod 700 /openvpn/client-configs/make_config.sh
+##ADD CLIENT KEYS GENERATOR SCRIPT
+#TO CREATE NEW OVPN PROFILE FOR A USER 
+#/openvpn/client-configs/make_config.sh <username>
