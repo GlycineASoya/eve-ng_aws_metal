@@ -1,13 +1,18 @@
 #!/bin/sh
 #At the first time:
 #On the server:
+#mkdir /etc/skel/.ssh
 #useradd -m -G sudo,adm <username>
+#chown -R <username>:adm /home/<username>/
+#chmod g+w /home/<username>/.ssh
 #On the client:
-#ssh-keygen -b 4096 -t ed25519 -f <output_file>
+#ssh-keygen -b 4096 -t rsa -f <output_file>
 #ssh-add <private_key>
 #ssh-copy-id [-i <pem_file>.pem] root@<host>
 #OR
 #scp [-i <pem_file>.pem] <output_file>.pub root@<host>:/home/<username>/.ssh/authorized_keys
+#chown <username>:<username> /home/<username> -R
+#chmod o-rwx /home/<username> -R
 
 #The client side
 #ssh-keygen -b 4096 -t ed25519 -f <output_file>
@@ -39,6 +44,7 @@ sed -i -e 's/# auth       required   pam_wheel.so/ auth       required   pam_whe
 sed -i -e 's/PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i -e 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 sed -i -e 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i -e 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
 
 #ADDING GOOGLE DNS NAMESERVER
 sed -i -e 's/nameserver 0.0.0.0/nameserver 8.8.8.8/' /etc/resolv.conf
@@ -283,3 +289,4 @@ chmod g+x /openvpn/client-configs/files
 ##ADD CLIENT KEYS GENERATOR SCRIPT
 #TO CREATE NEW OVPN PROFILE FOR A USER 
 #/openvpn/client-configs/make_config.sh <username>
+#scp <username>@<eve-ng>:/openvpn/client-configs/files/<username>.ovpn ~/
