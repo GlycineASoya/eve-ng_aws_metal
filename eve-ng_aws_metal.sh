@@ -240,7 +240,7 @@ cat > /openvpn/client-configs/base.conf << EOF
 client
 dev tun
 proto tcp
-remote 192.168.0.117 1194
+remote hardbasslab.ddns.net 1194
 resolv-retry infinite
 nobind
 persist-key
