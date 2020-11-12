@@ -256,6 +256,10 @@ EOF
 #CONFIGURING SCRIPT TO BUILD BASE CONF FILE
 cat > /openvpn/client-configs/make_config.sh << 'EOF'
 #!/bin/bash
+cd /openvpn/openvpn-ca
+source vars
+./build-key-pass ${1}
+
 # First argument: Client identifier
 KEY_DIR=/openvpn/openvpn-ca/keys
 OUTPUT_DIR=/openvpn/client-configs/files
@@ -274,6 +278,8 @@ cat ${BASE_CONFIG} \
     > ${OUTPUT_DIR}/${1}.ovpn
 EOF
 chmod 700 /openvpn/client-configs/make_config.sh
+chown -R root:adm /openvpn/client-configs/files
+chmod g+x /openvpn/client-configs/files
 ##ADD CLIENT KEYS GENERATOR SCRIPT
 #TO CREATE NEW OVPN PROFILE FOR A USER 
 #/openvpn/client-configs/make_config.sh <username>
