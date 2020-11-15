@@ -32,6 +32,7 @@ apt-get install -y make && \
 apt-get install -y wget && \
 apt-get install -y gcc && \
 apt-get install -y vim && \
+apt-get install -y bridge-utils && \
 apt-get install -y expect
 
 #CREATING IN SKELETON FOR NEW USERS .SSH DIR
@@ -50,7 +51,7 @@ sed -i -e 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
 sed -i -e 's/nameserver 0.0.0.0/nameserver 8.8.8.8/' /etc/resolv.conf
 
 #USING ETH NAMING IN GRUB
-sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 noquiet"/' /etc/default/grub
+sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 nbiosdevname=0 oquiet"/' /etc/default/grub
 update-grub
 
 #SET UP SCRIPT FOR INTERFACES
@@ -100,15 +101,11 @@ TimeoutStartSec=0
 [Install]
 WantedBy=shutdown.target reboot.target
 EOF
-systemctl enable eve-ng-interface-tuning.service
+systemctl enable --now eve-ng-interface-tuning.service
 
-
-#INSTALLING EVE-NG
-wget -O - http://www.eve-ng.net/repo/install-eve.sh | bash -i
-#after this command update clients known_hosts
 
 #CONFIGURING MASQUERADING FOR INTERNET ACCESS
-echo "1" > /proc/sys/net/ipv4/ip_forward
+sed -i -e 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
 iptables -A FORWARD -i pnet1 -j ACCEPT
 iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -o pnet0 -j MASQUERADE
 
@@ -116,6 +113,7 @@ iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -o pnet0 -j MASQUERADE
 iptables -A INPUT -i pnet1 -p udp -m udp --dport 67 -j ACCEPT
 iptables -A INPUT -i pnet1 -p udp -m udp --dport 53 -j ACCEPT
 iptables -A INPUT -i pnet1 -p tcp -m tcp --dport 1194 -j ACCEPT
+iptables -A INPUT -i pnet0 -p tcp -m tcp --dport 22 -j ACCEPT
 iptables-save
 
 #MAKE IT PERMANENT
@@ -290,3 +288,10 @@ chmod g+x /openvpn/client-configs/files
 #TO CREATE NEW OVPN PROFILE FOR A USER 
 #/openvpn/client-configs/make_config.sh <username>
 #scp <username>@<eve-ng>:/openvpn/client-configs/files/<username>.ovpn ~/
+
+#INSTALLING EVE-NG
+wget -O - http://www.eve-ng.net/repo/install-eve.sh | bash -i
+#after this command update clients known_hosts
+#after log in as root finish the installation
+#after it boots after the installation add the hostname to the localhost
+sed -i -e 's/127.0.0.1 localhost/127.0.0.1 localhost eve-ng/' /etc/hosts
