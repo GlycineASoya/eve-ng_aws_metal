@@ -51,7 +51,7 @@ sed -i -e 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
 sed -i -e 's/nameserver 0.0.0.0/nameserver 8.8.8.8/' /etc/resolv.conf
 
 #USING ETH NAMING IN GRUB
-sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 nbiosdevname=0 oquiet"/' /etc/default/grub
+sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 biosdevname=0 noquiet"/' /etc/default/grub
 update-grub
 
 #SET UP SCRIPT FOR INTERFACES
