@@ -54,6 +54,9 @@ sed -i -e 's/nameserver 0.0.0.0/nameserver 8.8.8.8/' /etc/resolv.conf
 sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 biosdevname=0 noquiet"/' /etc/default/grub
 update-grub
 
+sed -i -e 's/NAME=.*/NAME="eth0"/' /etc/udev/rules.d/70-persistent-net.rules
+mv /lib/udev/rules.d/80-net-setup-link.rules /lib/udev/rules.d/80-net-setup-link.rules.old
+
 #SET UP SCRIPT FOR INTERFACES
 cat > /etc/eve-ng-interface-tuning.sh << EOF
 #!/bin/sh
