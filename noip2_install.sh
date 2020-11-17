@@ -28,6 +28,8 @@ cat > /etc/systemd/system/noip2.service << EOF
 # /etc/systemd/system/noip2.service
 [Unit]
 Description=NoIP2
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 ExecStart=/usr/local/bin/noip2
@@ -37,5 +39,6 @@ Type=forking
 WantedBy=multi-user.target
 EOF
 systemctl enable --now noip2.service
+
 systemctl restart noip2.service
 systemctl status noip2.service
