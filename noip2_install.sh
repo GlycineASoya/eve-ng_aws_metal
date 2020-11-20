@@ -10,10 +10,10 @@ cat > /etc/noip2/noip-2.1.9-1/makeinstall.sh << EOF
 #!/usr/bin/expect -f
 spawn make install
 expect "Please enter the login/email string for no-ip.com*"
-send "ivlevinsky@gmail.com\r"
+send "<your_id>\r"
 sleep 5
 expect "Please enter the password for user*"
-send "qp#qb4xB5J2ndv+\r"
+send "<your_password>\r"
 expect "Please enter an update interval*"
 send "1\r"
 expect "Do you wish to run something at successful update?*"
